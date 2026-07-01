@@ -1,13 +1,16 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { HttpsProxyAgent } from "https-proxy-agent";
+import type { Agent as HttpsAgent } from "https";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@/lib/prisma";
 
 const googleProxyUrl = process.env.GOOGLE_OAUTH_PROXY;
-const googleProxyAgent = googleProxyUrl ? new HttpsProxyAgent(googleProxyUrl) : undefined;
+const googleProxyAgent = googleProxyUrl
+  ? (new HttpsProxyAgent(googleProxyUrl) as unknown as HttpsAgent)
+  : undefined;
 const googleHttpOptions = googleProxyAgent
   ? { timeout: 15000, agent: googleProxyAgent }
   : { timeout: 15000 };
