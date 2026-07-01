@@ -1,4 +1,14 @@
-export default function AccountPage() {
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+import { authOptions } from "@/lib/auth";
+
+export default async function AccountPage() {
+  const session = await getServerSession(authOptions);
+
+  if (!session) {
+    redirect("/login?callbackUrl=/account");
+  }
+
   const cards = [
     ["Plan", "Free account · 30 messages/day"],
     ["NSFW mode", "Off by default · enable from settings"],

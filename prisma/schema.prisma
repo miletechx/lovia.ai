@@ -1,0 +1,401 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email              String    @unique @db.VarChar(255)
+  username           String?   @unique @db.VarChar(50)
+  name               String?   @db.VarChar(100)
+  image              String?   @map("avatar_url")
+  passwordHash       String?   @map("password_hash")
+  emailVerified      DateTime? @map("email_verified_at")
+  ageConfirmed       Boolean   @default(false) @map("age_confirmed")
+  subscriptionStatus String    @default("free") @map("subscription_status") @db.VarChar(30)
+  accountStatus      String    @default("active") @map("account_status") @db.VarChar(30)
+  lastLoginAt        DateTime? @map("last_login_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  accounts            Account[]
+  sessions            Session[]
+  settings            UserSettings?
+  conversations        Conversation[]
+  memories             Memory[]
+  usageLimits          UsageLimit[]
+  subscription         Subscription?
+  payments             Payment[]
+  imageGenerations     ImageGeneration[]
+  moderationLogs       ContentModerationLog[]
+  privacyActions       PrivacyAction[]
+  characterFavorites   CharacterFavorite[]
+  userCharacterStates  UserCharacterState[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  type              String   @default("oauth") @db.VarChar(50)
+  provider          String   @db.VarChar(50)
+  providerAccountId String   @map("provider_account_id") @db.VarChar(255)
+  access_token      String?
+  refresh_token     String?
+  expires_at        Int?
+  token_type        String?  @db.VarChar(50)
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  sessionToken String   @unique @map("session_token") @db.VarChar(255)
+  expires      DateTime
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expires])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  identifier String   @db.VarChar(255)
+  token      String   @unique @db.VarChar(255)
+  type       String   @default("email_verify") @db.VarChar(30)
+  expires    DateTime
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([identifier, token])
+  @@index([identifier])
+  @@index([expires])
+  @@map("verification_tokens")
+}
+
+model UserSettings {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                  String   @unique @map("user_id") @db.Uuid
+  nsfwEnabled             Boolean  @default(false) @map("nsfw_enabled")
+  preferredLanguage       String   @default("en") @map("preferred_language") @db.VarChar(20)
+  marketingEmailsEnabled  Boolean  @default(false) @map("marketing_emails_enabled")
+  memoryEnabled           Boolean  @default(true) @map("memory_enabled")
+  imageGenerationEnabled  Boolean  @default(true) @map("image_generation_enabled")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+model Character {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String   @db.VarChar(100)
+  slug             String   @unique @db.VarChar(120)
+  age              Int
+  avatarUrl        String?  @map("avatar_url")
+  coverUrl         String?  @map("cover_url")
+  shortBio         String?  @map("short_bio")
+  description      String?
+  personalityTags  String[] @map("personality_tags")
+  relationshipTags String[] @map("relationship_tags")
+  visualTags       String[] @map("visual_tags")
+  isPremium        Boolean  @default(false) @map("is_premium")
+  nsfwSupported    Boolean  @default(false) @map("nsfw_supported")
+  systemPrompt     String   @map("system_prompt")
+  greetingMessage  String?  @map("greeting_message")
+  sortOrder        Int      @default(0) @map("sort_order")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  conversations       Conversation[]
+  memories            Memory[]
+  imageGenerations    ImageGeneration[]
+  favorites           CharacterFavorite[]
+  userCharacterStates UserCharacterState[]
+
+  @@index([slug])
+  @@index([isPremium])
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("characters")
+}
+
+model AnonymousUser {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  anonymousId  String   @unique @map("anonymous_id") @db.VarChar(255)
+  ipHash       String?  @map("ip_hash")
+  userAgent    String?  @map("user_agent")
+  ageConfirmed Boolean  @default(false) @map("age_confirmed")
+  createdAt    DateTime @default(now()) @map("created_at")
+  lastSeenAt   DateTime @default(now()) @map("last_seen_at")
+
+  @@map("anonymous_users")
+}
+
+model Conversation {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String?  @map("user_id") @db.Uuid
+  anonymousId String?  @map("anonymous_id") @db.VarChar(255)
+  characterId String   @map("character_id") @db.Uuid
+  title       String?  @db.VarChar(255)
+  status      String   @default("active") @db.VarChar(30)
+  isNsfw      Boolean  @default(false) @map("is_nsfw")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user             User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  character        Character         @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  messages         Message[]
+  memories         Memory[]
+  imageGenerations ImageGeneration[]
+  moderationLogs   ContentModerationLog[]
+
+  @@index([userId])
+  @@index([anonymousId])
+  @@index([characterId])
+  @@index([status])
+  @@index([updatedAt])
+  @@map("conversations")
+}
+
+model Message {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId   String   @map("conversation_id") @db.Uuid
+  role             String   @db.VarChar(20)
+  content          String
+  type             String   @default("text") @db.VarChar(30)
+  tokenCount       Int      @default(0) @map("token_count")
+  isNsfw           Boolean  @default(false) @map("is_nsfw")
+  moderationStatus String   @default("pending") @map("moderation_status") @db.VarChar(30)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  conversation     Conversation           @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  imageGenerations ImageGeneration[]
+  moderationLogs   ContentModerationLog[]
+
+  @@index([conversationId])
+  @@index([role])
+  @@index([createdAt])
+  @@index([moderationStatus])
+  @@map("messages")
+}
+
+model Memory {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String   @map("user_id") @db.Uuid
+  characterId        String   @map("character_id") @db.Uuid
+  summary            String?
+  preferences        Json     @default("{}")
+  boundaries         Json     @default("{}")
+  relationshipStage  String   @default("new") @map("relationship_stage") @db.VarChar(50)
+  characterImpression String? @map("character_impression")
+  lastConversationId String?  @map("last_conversation_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character        Character     @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  lastConversation Conversation? @relation(fields: [lastConversationId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, characterId])
+  @@index([userId])
+  @@index([characterId])
+  @@index([relationshipStage])
+  @@map("memories")
+}
+
+model UsageLimit {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String?  @map("user_id") @db.Uuid
+  anonymousId  String?  @map("anonymous_id") @db.VarChar(255)
+  usageDate    DateTime @map("usage_date") @db.Date
+  messageCount Int      @default(0) @map("message_count")
+  imageCount   Int      @default(0) @map("image_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, usageDate])
+  @@unique([anonymousId, usageDate])
+  @@index([usageDate])
+  @@map("usage_limits")
+}
+
+model Subscription {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId               String    @unique @map("user_id") @db.Uuid
+  stripeCustomerId     String?   @map("stripe_customer_id") @db.VarChar(255)
+  stripeSubscriptionId String?   @map("stripe_subscription_id") @db.VarChar(255)
+  status               String    @default("inactive") @db.VarChar(50)
+  planName             String    @default("premium_monthly") @map("plan_name") @db.VarChar(50)
+  priceAmount          Int       @default(1499) @map("price_amount")
+  currency             String    @default("usd") @db.VarChar(10)
+  currentPeriodStart   DateTime? @map("current_period_start")
+  currentPeriodEnd     DateTime? @map("current_period_end")
+  cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
+  canceledAt           DateTime? @map("canceled_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String    @map("user_id") @db.Uuid
+  subscriptionId        String?   @map("subscription_id") @db.Uuid
+  stripePaymentIntentId String?   @map("stripe_payment_intent_id") @db.VarChar(255)
+  stripeInvoiceId       String?   @map("stripe_invoice_id") @db.VarChar(255)
+  amount                Int
+  currency              String    @default("usd") @db.VarChar(10)
+  status                String    @db.VarChar(50)
+  paidAt                DateTime? @map("paid_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("payments")
+}
+
+model ImageGeneration {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  characterId      String   @map("character_id") @db.Uuid
+  conversationId   String?  @map("conversation_id") @db.Uuid
+  messageId        String?  @map("message_id") @db.Uuid
+  prompt           String
+  negativePrompt   String?  @map("negative_prompt")
+  imageUrl         String?  @map("image_url")
+  provider         String?  @db.VarChar(50)
+  status           String   @default("pending") @db.VarChar(30)
+  moderationStatus String   @default("pending") @map("moderation_status") @db.VarChar(30)
+  errorMessage     String?  @map("error_message")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character      Character     @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  message        Message?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  moderationLogs ContentModerationLog[]
+
+  @@index([userId])
+  @@index([characterId])
+  @@index([conversationId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("image_generations")
+}
+
+model ContentModerationLog {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String?  @map("user_id") @db.Uuid
+  anonymousId       String?  @map("anonymous_id") @db.VarChar(255)
+  conversationId    String?  @map("conversation_id") @db.Uuid
+  messageId         String?  @map("message_id") @db.Uuid
+  imageGenerationId String?  @map("image_generation_id") @db.Uuid
+  contentType       String   @map("content_type") @db.VarChar(30)
+  inputText         String?  @map("input_text")
+  result            String   @db.VarChar(30)
+  reason            String?
+  provider          String?  @db.VarChar(50)
+  rawResponse       Json     @default("{}") @map("raw_response")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  conversation    Conversation?     @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  message         Message?          @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  imageGeneration ImageGeneration?  @relation(fields: [imageGenerationId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([conversationId])
+  @@index([result])
+  @@index([createdAt])
+  @@map("content_moderation_logs")
+}
+
+model PrivacyAction {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  actionType String   @map("action_type") @db.VarChar(50)
+  targetType String?  @map("target_type") @db.VarChar(50)
+  targetId   String?  @map("target_id") @db.Uuid
+  status     String   @default("completed") @db.VarChar(30)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([actionType])
+  @@index([createdAt])
+  @@map("privacy_actions")
+}
+
+model CharacterFavorite {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  characterId String   @map("character_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, characterId])
+  @@index([userId])
+  @@index([characterId])
+  @@map("character_favorites")
+}
+
+model UserCharacterState {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  characterId       String    @map("character_id") @db.Uuid
+  relationshipLevel Int       @default(0) @map("relationship_level")
+  relationshipLabel String    @default("new") @map("relationship_label") @db.VarChar(50)
+  totalMessages     Int       @default(0) @map("total_messages")
+  lastInteractionAt DateTime? @map("last_interaction_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, characterId])
+  @@index([userId])
+  @@index([characterId])
+  @@index([relationshipLevel])
+  @@map("user_character_states")
+}
