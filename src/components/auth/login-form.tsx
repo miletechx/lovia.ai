@@ -1,5 +1,6 @@
 "use client";
 
+import { Turnstile } from "@marsidev/react-turnstile";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
@@ -11,6 +12,7 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -24,7 +26,7 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
         const response = await fetch("/api/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, username, password }),
+          body: JSON.stringify({ email, username, password, turnstileToken }),
         });
 
         if (!response.ok) {
@@ -107,6 +109,16 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
           type="password"
           value={password}
         />
+        {mode === "register" ? (
+          <div className="flex justify-center">
+            <Turnstile
+              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+              onSuccess={(token) => {
+                setTurnstileToken(token);
+              }}
+            />
+          </div>
+        ) : null}
         {error ? <p className="rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-100">{error}</p> : null}
         <button
           className="w-full rounded-full bg-gradient-to-r from-rose-300 to-violet-500 px-5 py-3 text-sm font-bold text-[#130B1F] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"

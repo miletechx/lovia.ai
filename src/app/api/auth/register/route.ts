@@ -1,12 +1,36 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
+type TurnstileVerifyResult = {
+  success: boolean;
+};
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const turnstileToken = typeof body.turnstileToken === "string" ? body.turnstileToken : "";
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const username = typeof body.username === "string" ? body.username.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";
+
+    if (!turnstileToken) {
+      return Response.json({ error: "请先完成人机验证。" }, { status: 403 });
+    }
+
+    const verifyResponse = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        secret: process.env.TURNSTILE_SECRET_KEY,
+        response: turnstileToken,
+      }),
+    });
+
+    const verifyResult = (await verifyResponse.json()) as TurnstileVerifyResult;
+
+    if (!verifyResult.success) {
+      return Response.json({ error: "人机验证失败，请重试" }, { status: 403 });
+    }
 
     if (!email || !password) {
       return Response.json({ error: "Email and password are required." }, { status: 400 });
