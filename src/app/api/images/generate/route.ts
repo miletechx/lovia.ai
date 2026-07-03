@@ -1,5 +1,7 @@
+import { nanoid } from "nanoid";
 import { toPublicImageError } from "@/lib/image/errors";
 import { generateCompanionImage } from "@/lib/image/service";
+import { uploadRemoteFileToR2 } from "@/lib/r2";
 
 export async function POST(request: Request) {
   try {
@@ -23,10 +25,12 @@ export async function POST(request: Request) {
       characterId,
       prompt,
     });
+    const fileName = `images/${nanoid()}.png`;
+    const permanentImageUrl = await uploadRemoteFileToR2(result.imageUrl, fileName, "image/png");
 
     return Response.json({
       image: {
-        url: result.imageUrl,
+        url: permanentImageUrl,
         size: result.size,
       },
       model: result.model,
